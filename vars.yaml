@@ -1,0 +1,4 @@
+AUTH_URL: "<AUTH_URL>"
+AUTH_TOKEN: "<AUTH_TOKEN>"
+GROUP_NAME: "<group>"
+SERVICE: "<service-name>"
