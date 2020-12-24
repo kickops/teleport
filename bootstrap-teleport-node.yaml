@@ -1,0 +1,101 @@
+---
+
+- hosts: all
+  name: Install and configure teleport Nodes
+  vars_files:
+    - vars.yaml
+  become: yes
+  become_method: sudo
+  connection: ssh
+  gather_facts: yes
+  tasks:
+    - name: Get dynamic ip address from the node
+      uri:
+        url: http://169.254.169.254/latest/meta-data/local-ipv4 
+        return_content: yes
+      #shell: curl http://169.254.169.254/latest/meta-data/local-ipv4
+      register: LOCAL_IP
+
+    - name: Get FQDN address from the node
+      uri:
+        url: http://169.254.169.254/latest/meta-data/local-hostname 
+        return_content: yes
+        #shell: curl http://169.254.169.254/latest/meta-data/local-hostname
+      register: LOCAL_HOSTNAME
+
+    - name: Remove existing teleport data directory
+      file:
+        state: absent
+        path: "/var/lib/teleport/"
+
+    - name: Install Teleport package if ubuntu
+      apt:
+        deb: https://get.gravitational.com/teleport-ent_5.0.1_amd64.deb
+      when: ansible_os_family == "Debian"  
+
+    - name: Install Teleport package if redhat/centos/Amazonlinux
+      yum:
+        name: https://get.gravitational.com/teleport-ent-5.0.1-1.x86_64.rpm 
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create user teleport and add to adm group 
+      user:
+        name: teleport
+        comment: teleport user
+        groups: adm
+        append: yes
+        system: yes
+        home: /var/lib/teleport
+
+    - name:  Create teleport directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: teleport
+        group: teleport
+        mode: 0700
+      loop:
+        - /run/teleport
+        - /var/lib/teleport
+        - /etc/teleport.d
+
+    - name: Write the teleport configuration yaml file
+      template:
+        src: templates/teleport-yaml.j2
+        dest: /etc/teleport.yaml
+        owner: root
+        group: root
+        mode: 0664
+
+    - name: Copy pam configuration to target nodes 
+      copy:
+        src: files/teleport-pam.conf
+        dest: /etc/pam.d/teleport
+
+    - name: Create teleport group
+      group:
+        name: teleport-admin
+        state: present
+
+    - name: Copy sudoers configuration to target nodes 
+      copy:
+        src: files/teleport-sudoers.conf
+        dest: /etc/sudoers.d/teleport
+
+    - name: create pam-exec.d directory
+      file: path=/etc/pam-exec.d state=directory
+
+    - name: Copy pam execution script to target nodes 
+      copy:
+        src: files/teleport-pam-exec.sh
+        dest: /etc/pam-exec.d/teleport_acct
+        mode: u+x,g+x,o+x
+
+    - name: Reload and start the teleport service
+      systemd:
+        state: restarted
+        daemon_reload: yes
+        name: teleport
+        enabled: yes
+
