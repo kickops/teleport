@@ -1,0 +1,23 @@
+teleport:
+  auth_token: {{ AUTH_TOKEN }}
+  nodename: {{ LOCAL_HOSTNAME.content }}
+  advertise_ip: {{ LOCAL_IP.content }}
+  log:
+    output: syslog
+    severity: INFO
+  auth_servers:
+    - {{ AUTH_URL }}:3025
+auth_service:
+  enabled: no
+ssh_service:
+  enabled: yes
+  listen_addr: 0.0.0.0:3022
+  labels:
+    group: {{ GROUP_NAME }}
+    service: {{ SERVICE }}
+    instance: {{ node_name }}
+  pam:
+    enabled: true
+    service_name: "teleport"
+proxy_service:
+  enabled: no
